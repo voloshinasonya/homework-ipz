@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Task Manager</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --accent-color: #38bdf8;
+            --accent-hover: #0ea5e9;
+            --success-color: #34d399;
+            --danger-color: #f87171;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin-top: 40px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--accent-color);
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+        }
+
+        .badge {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .task-form {
+            background-color: var(--card-bg);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #94a3b8;
+            font-size: 0.95rem;
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: #0f172a;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .tasks-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .task-card {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid var(--accent-color);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .task-card:hover {
+            transform: scale(1.01);
+        }
+
+        .task-card.done {
+            border-left-color: var(--success-color);
+            opacity: 0.7;
+        }
+
+        .task-card.done .task-title {
+            text-decoration: line-through;
+            color: #94a3b8;
+        }
+
+        .task-info h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.2rem;
+        }
+
+        .task-info p {
+            margin: 0;
+            color: #94a3b8;
+            font-size: 0.95rem;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-action {
+            width: auto;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+        }
+
+        .btn-complete { background-color: var(--success-color); color: #0f172a; }
+        .btn-delete { background-color: var(--danger-color); color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐳 Docker Task Manager</h1>
+            <span class="badge">Frontend component connected via Nginx</span>
+        </header>
+
+        <div class="task-form">
+            <div class="form-group">
+                <label for="taskTitle">Назва завдання</label>
+                <input type="text" id="taskTitle" placeholder="Що потрібно зробити?">
+            </div>
+            <div class="form-group">
+                <label for="taskDesc">Опис завдання</label>
+                <textarea id="taskDesc" rows="2" placeholder="Додаткові деталі..."></textarea>
+            </div>
+            <button onclick="createTask()">Додати завдання</button>
+        </div>
+
+        <h2>📋 Список ваших завдань</h2>
+        <div id="tasksList" class="tasks-list">
+            </div>
+    </div>
+
+    <script>
+        // Робимо запити на наш API сервер
+        const API_URL = 'http://localhost:5000/tasks';
+
+        async function loadTasks() {
+            try {
+                const response = await fetch(API_URL);
+                const tasks = await response.json();
+                const listElement = document.getElementById('tasksList');
+                listElement.innerHTML = '';
+
+                if (tasks.length === 0) {
+                    listElement.innerHTML = '<p style="text-align:center; color:#64748b;">Завдань поки немає. Створіть перше!</p>';
+                    return;
+                }
+
+                tasks.forEach(task => {
+                    const card = document.createElement('div');
+                    card.className = `task-card ${task.done ? 'done' : ''}`;
+                    card.innerHTML = `
+                        <div class="task-info">
+                            <h3 class="task-title">${task.title}</h3>
+                            <p>${task.description || 'Немає опису'}</p>
+                        </div>
+                        <div class="task-actions">
+                            ${!task.done ? `<button class="btn-action btn-complete" onclick="toggleTask(${task.id}, ${task.done})">✓</button>` : ''}
+                            <button class="btn-action btn-delete" onclick="deleteTask(${task.id})">🗑</button>
+                        </div>
+                    `;
+                    listElement.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Помилка завантаження:', error);
+            }
+        }
+
+        async function createTask() {
+            const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDesc').value;
+
+            if (!title) {
+                alert('Назва завдання обовʼязкова!');
+                return;
+            }
+
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, description })
+                });
+                document.getElementById('taskTitle').value = '';
+                document.getElementById('taskDesc').value = '';
+                loadTasks();
+            } catch (error) {
+                console.error('Помилка створення:', error);
+            }
+        }
+
+        async function toggleTask(id, currentStatus) {
+            try {
+                await fetch(`${API_URL}/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ done: !currentStatus })
+                });
+                loadTasks();
+            } catch (error) {
+                console.error('Помилка оновлення:', error);
+            }
+        }
+
+        async function deleteTask(id) {
+            try {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                loadTasks();
+            } catch (error) {
+                console.error('Помилка видалення:', error);
+            }
+        }
+
+        // Завантажуємо дані при старті сторінки
+        loadTasks();
+    </script>
+</body>
+</html>

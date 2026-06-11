@@ -1,0 +1,8 @@
+flask
+psycopg2-binary
+flask
+psycopg2-binary
+flask-cors
+flask
+psycopg2-binary
+flask-cors
